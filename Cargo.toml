@@ -1,0 +1,5 @@
+[package]
+
+name = "ircbot"
+version = "0.0.1"
+authors = ["Mamacos <dainem@amazon.com>"]
