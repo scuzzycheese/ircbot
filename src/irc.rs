@@ -12,10 +12,10 @@ pub struct Connector<'a>
 }
 
 
-impl<'a> Iterator<Vec<u8>> for Connector<'a>
+impl<'a> Iterator<Message> for Connector<'a>
 {
    //This function needs to return one message at a time (ie: one line at a time)
-   fn next(&mut self) -> Option<Vec<u8>> 
+   fn next(&mut self) -> Option<Message> 
    {
       let mut message: Vec<u8>; 
 
@@ -85,7 +85,10 @@ impl<'a> Iterator<Vec<u8>> for Connector<'a>
          //print!("Start: {} Message: {}", self.start, message);
          if must_break { break; }
       }
-      Some(message)
+
+
+      let mess_struct: Message = self.parse_message(&message).unwrap();
+      Some(mess_struct)
    }
 }
 
@@ -130,20 +133,47 @@ impl<'a> Connector<'a>
       Ok(0)
    }
 
-   fn parse_message(&mut self, message: &Vec<u8>)
+   fn parse_message(&mut self, message: &Vec<u8>) -> Result<Message, &'static str>
    {
+      let message_string = str::from_utf8(message.as_slice()).unwrap();
+      if message_string.contains("PRIVMSG")
+      {
+         let priv_index = message_string.find_str("PRIVMSG").unwrap();
+         let mut message_parts = message_string.slice_from(priv_index).splitn(2, ' ');
+         message_parts.next();
+         message_parts.next();
+         let message_part = message_parts.next().unwrap();
+
+         return Ok
+         (
+            Message
+            {
+               message_type: MessageType::PrivateMessage,
+               message: message_part.slice_from(1).as_bytes().to_vec(),
+            }
+         );
+      }
+      Ok
+      (
+         Message
+         {
+            message_type: MessageType::Unknown,
+            message: message.clone(),
+         }
+      )
    }
 }
 
 
 pub enum MessageType
 {
+   Unknown,
    PrivateMessage,
    ChannelMessage,
 }
 
-pub struct Message<'a>
+pub struct Message
 {
-   message_type: MessageType,
-   message: &'a Vec<u8>,
+   pub message_type: MessageType,
+   pub message: Vec<u8>,
 }
