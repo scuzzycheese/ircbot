@@ -17,12 +17,13 @@ impl<'a> Iterator<Message> for Connector<'a>
    //This function needs to return one message at a time (ie: one line at a time)
    fn next(&mut self) -> Option<Message> 
    {
-      let mut message: Vec<u8>; 
+      let mut message_vec: Vec<u8>; 
+      let mut message: Message;
 
       loop
       {
          let mut must_break: bool = true;
-         message = Vec::with_capacity(512);
+         message_vec = Vec::with_capacity(512);
 
          let mut found_cr: bool = false;
          let mut found_lf: bool = false;
@@ -45,7 +46,7 @@ impl<'a> Iterator<Message> for Connector<'a>
             {
                self.start += 1;
 
-               message.push(*chr);
+               message_vec.push(*chr);
                match *chr as char
                {
                   //TODO: make sure these are sequential
@@ -72,23 +73,29 @@ impl<'a> Iterator<Message> for Connector<'a>
             }
          }
 
-         let message_string = str::from_utf8(message.as_slice()).unwrap();
-         if message_string.starts_with("PING")
+         
+         message = self.parse_message(&message_vec).unwrap();
+         
+         match message.command.as_ref()
          {
-            match self.ping_pong(message_string) 
+            Some(x) => 
             {
-               Ok(_) => { must_break = false; },
-               Err(e) => { println!("Error sending PONG to server: {}", e); },
-            }
+               if x.as_slice() == "PING"
+               {
+                  match self.ping_pong(&message) 
+                  {
+                     Ok(_) => { must_break = false; },
+                     Err(e) => { println!("Error sending PONG to server: {}", e); return None },
+                  }
+               }
+            },
+            None => {}
          }
-         //print!("Start: {} Message: {}", self.start, str::from_utf8(message.as_slice()).unwrap());
-         //print!("Start: {} Message: {}", self.start, message);
          if must_break { break; }
       }
 
 
-      let mess_struct: Message = self.parse_message(&message).unwrap();
-      Some(mess_struct)
+      Some(message)
    }
 }
 
@@ -121,46 +128,78 @@ impl<'a> Connector<'a>
    }
 
 
-   fn ping_pong(&mut self, read_string: &str) -> IoResult<uint>
+   fn ping_pong(&mut self, message: &Message) -> IoResult<uint>
    {
-      //println!("Initial string len: {}", read_string.len());
-      let mut ping_parts = read_string.splitn(1, ' ');
-      //println!("First String len: {}", ping_parts.next().unwrap().len());
-      let pong_resp = ping_parts.next().unwrap();
-      //println!("pong_resp length: {}", pong_resp.len());
-      println!("Send -> PONG {}", pong_resp);
-      try!(self.sock.write(format!("PONG {}", pong_resp).as_bytes()));
+      let pong_resp = format!("PONG {}", message.trailing);
+      println!("Send -> {}", pong_resp);
+      try!(self.sock.write(pong_resp.as_bytes()));
       Ok(0)
    }
 
    fn parse_message(&mut self, message: &Vec<u8>) -> Result<Message, &'static str>
    {
-      let message_string = str::from_utf8(message.as_slice()).unwrap();
-      if message_string.contains("PRIVMSG")
-      {
-         let priv_index = message_string.find_str("PRIVMSG").unwrap();
-         let mut message_parts = message_string.slice_from(priv_index).splitn(2, ' ');
-         message_parts.next();
-         message_parts.next();
-         let message_part = message_parts.next().unwrap();
+      let message_string: &str = str::from_utf8(message.as_slice()).unwrap();
 
-         return Ok
-         (
+      let mut message_parts = message_string.splitn(3, ' ');
+
+      let mut prefix: Option<String> = None;
+      let mut command: Option<String> = None;
+      let mut params: Option<String> = None;
+      let mut trailing: Option<String> = None;
+
+      for message_part in message_parts
+      {
+         if message_part.starts_with(":") && prefix == None
+         {
+            prefix = Some(String::from_str(message_part));
+            continue;
+         }
+
+         if message_part.starts_with(":") && prefix != None
+         {
+            trailing = Some(String::from_str(message_part));
+            continue;
+         }
+
+         if command == None 
+         {
+            command = Some(String::from_str(message_part));
+            continue;
+         }
+         else
+         {
+            params = Some(String::from_str(message_part));
+            continue;
+         }
+      }
+
+      let message_struct = match command.as_ref().unwrap().as_slice()
+      {
+         "PRIVMSG" =>
+         {
             Message
             {
                message_type: MessageType::PrivateMessage,
-               message: message_part.slice_from(1).as_bytes().to_vec(),
+               prefix: prefix,
+               command: command,
+               params: params,
+               trailing: trailing,
             }
-         );
-      }
-      Ok
-      (
-         Message
+         },
+         _ => 
          {
-            message_type: MessageType::Unknown,
-            message: message.clone(),
-         }
-      )
+            Message
+            {
+               message_type: MessageType::Unknown,
+               prefix: prefix,
+               command: command,
+               params: params,
+               trailing: trailing,
+            }
+         },
+      };
+
+      Ok(message_struct)
    }
 }
 
@@ -175,5 +214,9 @@ pub enum MessageType
 pub struct Message
 {
    pub message_type: MessageType,
-   pub message: Vec<u8>,
+
+   pub prefix: Option<String>,
+   pub command: Option<String>,
+   pub params: Option<String>,
+   pub trailing: Option<String>,
 }
