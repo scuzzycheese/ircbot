@@ -1,5 +1,7 @@
-use std::io::{TcpStream, IoResult};
 use std::str;
+use std::io::prelude::*;
+use std::net::TcpStream;
+use std::io;
 
 pub struct Connector<'a>
 {
@@ -12,9 +14,9 @@ pub struct Connector<'a>
 }
 
 
-impl<'a, 'b> Iterator for Connector<'a>
+impl<'a> Iterator for Connector<'a>
 {
-   type Item = Message<'b>;
+   type Item = Message;
 
    //This function needs to return one message at a time (ie: one line at a time)
    fn next(&mut self) -> Option<Message> 
@@ -44,7 +46,8 @@ impl<'a, 'b> Iterator for Connector<'a>
                }
             }
 
-            for chr in self.buf.slice(self.start, self.end).iter()
+
+            for chr in (&self.buf[self.start..self.end]).iter()
             {
                self.start += 1;
 
@@ -69,8 +72,8 @@ impl<'a, 'b> Iterator for Connector<'a>
             if !found_cr && !found_lf 
             { 
                self.buf = [0; 512];
-               self.start = 0u;
-               self.end = 0u;
+               self.start = 0;
+               self.end = 0;
                self.need_to_read = true; 
             }
          }
@@ -78,20 +81,17 @@ impl<'a, 'b> Iterator for Connector<'a>
          
          message = self.parse_message(message_vec).unwrap();
          
-         match message.command.as_ref()
+         match message.get_command().unwrap()
          {
-            Some(x) => 
+				"PING" =>
             {
-               if x.as_slice() == "PING"
+               match self.ping_pong(&message) 
                {
-                  match self.ping_pong(&message) 
-                  {
-                     Ok(_) => { must_break = false; },
-                     Err(e) => { println!("Error sending PONG to server: {}", e); return None },
-                  }
+                  Ok(_) => { must_break = false; },
+                  Err(e) => { println!("Error sending PONG to server: {}", e); return None },
                }
             },
-            None => {}
+            _ => {}
          }
          if must_break { break; }
       }
@@ -111,79 +111,95 @@ impl<'a> Connector<'a>
          nick: nick,
          buf: [0; 512],
          need_to_read: true,
-         start: 0u,
-         end: 0u,
+         start: 0,
+         end: 0,
       }   
    }
 
-   pub fn connect(&mut self) -> IoResult<usize>
+   pub fn connect(&mut self) -> io::Result<usize>
    {
       try!(self.sock.write(format!("NICK {}\r\n", self.nick).as_bytes()));
       try!(self.sock.write(format!("USER {} 2 * : {}\r\n", self.nick, self.nick).as_bytes()));
       Ok(0)
    }
 
-   pub fn join_channel(&mut self, channel_name: &str) -> IoResult<usize>
+   pub fn join_channel(&mut self, channel_name: &str) -> io::Result<usize>
    {
       try!(self.sock.write(format!("JOIN {}\r\n", channel_name).as_bytes()));
       Ok(0)
    }
 
 
-   fn ping_pong(&mut self, message: &Message) -> IoResult<usize>
+   fn ping_pong(&mut self, message: &Message) -> io::Result<usize>
    {
-      let pong_resp = format!("PONG {}", message.trailing.unwrap());
+      let pong_resp = format!("PONG {}", message.get_trailing().unwrap());
       println!("Send -> {}", pong_resp);
       try!(self.sock.write(pong_resp.as_bytes()));
       Ok(0)
    }
 
-   fn parse_message<'b>(&mut self, message_vec: Vec<u8>) -> Result<Message<'b>, &'static str>
+   fn parse_message(&mut self, message_vec: Vec<u8>) -> Result<Message, &'static str>
    {
-      let message_string: &'b str = str::from_utf8(message_vec.as_slice()).unwrap();
 
-      let mut message_parts = message_string.splitn(3, ' ');
+		let message_slice: &[u8] = message_vec.as_slice();
 
-      let mut prefix: Option<&str> = None;
-      let mut command: Option<&str> = None;
-      let mut params: Option<&str> = None;
-      let mut trailing: Option<&str> = None;
+      let message_string: &str = str::from_utf8(message_slice).unwrap();
 
+      let mut message_parts = message_string.match_indices(' ');
+
+      let mut prefix: Option<(usize, usize)> = None;
+      let mut command: Option<(usize, usize)> = None;
+      let mut params: Option<(usize, usize)> = None;
+      let mut trailing: Option<(usize, usize)> = None;
+
+      let mut current_start: usize = 0;
+      let mut current_count: usize = 0;
       //TODO: fix this parsing order
       for message_part in message_parts
       {
-         if message_part.starts_with(":") && prefix == None
+         if current_count > 2
          {
-            prefix = Some(message_part);
+            break;
+         }
+
+         let (index, match_str) = message_part;
+
+         if match_str.starts_with(":") && prefix == None
+         {
+            prefix = Some((current_start, index));
             continue;
          }
 
-         if message_part.starts_with(":") && prefix != None
+         if match_str.starts_with(":") && prefix != None
          {
-            trailing = Some(message_part);
+            trailing = Some((current_start, index));
             continue;
          }
 
          if command == None 
          {
-            command = Some(message_part);
+            command = Some((current_start, index));
             continue;
          }
          else
          {
-            params = Some(message_part);
+            params = Some((current_start, index));
             continue;
          }
+         current_start = index + 1;
+         current_count = current_count + 1;
       }
 
-      let message_struct = match command.unwrap()
+      let (command_start, command_end) = command.unwrap();
+      //TODO: I need to understand why I have to make a reference below since it's already an &str
+      let message_struct = match &message_string[command_start .. command_end]
       {
          "PRIVMSG" =>
          {
             Message
             {
                message_type: MessageType::PrivateMessage,
-               message_vec: message_vec,
+               message_string: message_string.to_string(),
                prefix: prefix,
                command: command,
                params: params,
@@ -195,7 +211,7 @@ impl<'a> Connector<'a>
             Message
             {
                message_type: MessageType::Unknown,
-               message_vec: message_vec,
+               message_string: message_string.to_string(),
                prefix: prefix,
                command: command,
                params: params,
@@ -216,14 +232,44 @@ pub enum MessageType
    ChannelMessage,
 }
 
-pub struct Message<'a>
+pub struct Message
 {
    pub message_type: MessageType,
 
-   pub message_vec: Vec<u8>,
+   pub message_string: String,
 
-   pub prefix: Option<&'a str>,
-   pub command: Option<&'a str>,
-   pub params: Option<&'a str>,
-   pub trailing: Option<&'a str>,
+   pub prefix: Option<(usize, usize)>,
+   pub command: Option<(usize, usize)>,
+   pub params: Option<(usize, usize)>,
+   pub trailing: Option<(usize, usize)>,
 }
+
+
+impl Message
+{
+   pub fn get_prefix(&self) -> Option<&str>
+   {
+      let (prefix_start, prefix_end) = self.prefix.unwrap();
+      Some(&self.message_string[prefix_start .. prefix_end])
+   }
+
+   pub fn get_command(&self) -> Option<&str>
+   {
+      let (command_start, command_end) = self.prefix.unwrap();
+      Some(&self.message_string[command_start .. command_end])
+   }
+
+   pub fn get_params(&self) -> Option<&str>
+   {
+      let (params_start, params_end) = self.prefix.unwrap();
+      Some(&self.message_string[params_start .. params_end])
+   }
+
+   pub fn get_trailing(&self) -> Option<&str>
+   {
+      let (trailing_start, trailing_end) = self.prefix.unwrap();
+      Some(&self.message_string[trailing_start .. trailing_end])
+   }
+
+}
+
