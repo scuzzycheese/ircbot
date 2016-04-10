@@ -146,63 +146,50 @@ impl<'a> Connector<'a>
       let message_string: &str = str::from_utf8(message_slice).unwrap();
       print!("String: {}", message_string);
 
-      let message_parts = message_string.match_indices(' ');
+      let mut message_chars = message_string.char_indices().peekable();
 
       let mut prefix: Option<(usize, usize)> = None;
       let mut command: Option<(usize, usize)> = None;
       let mut params: Option<(usize, usize)> = None;
       let mut trailing: Option<(usize, usize)> = None;
 
-      let mut current_start: usize = 0;
-      let mut current_count: usize = 0;
-      let mut first_skip = false;
-      //TODO: fix this parsing order
-      for message_part in message_parts
+      let mut start_index = 0;
+      let mut word_counter = 0;
+      while let Some(message_char) = message_chars.next()
       {
-         if !first_skip 
+         let (index, char) = message_char;
+
+         if ' ' == char 
          {
-            first_skip = true;
-            current_start = 0;
-            continue;
+            match word_counter
+            {
+               0 => 
+               {
+                  prefix = Some((start_index, index));
+               },
+               1 => 
+               {
+                  command = Some((start_index, index));
+               },
+               2 => 
+               {
+                  params = Some((start_index, index));
+               },
+               _ => 
+               {
+                  trailing = Some((start_index, message_string.len()));
+                  break;
+               },
+            }
+            word_counter = word_counter + 1;
+            start_index = index + 1;
          }
 
-         if current_count > 2
-         {
-            break;
-         }
-         current_count = current_count + 1;
-
-         let (index, match_str) = message_part;
-         println!("current_start: {}, current_count: {}, index: {}", current_start, current_count, index);
-
-
-         if match_str.starts_with(":") && prefix == None
-         {
-            prefix = Some((current_start, index));
-            current_start = index;
-            continue;
-         }
-
-         if match_str.starts_with(":") && prefix != None
-         {
-            trailing = Some((current_start, index));
-            current_start = index;
-            continue;
-         }
-
-         if command == None 
-         {
-            command = Some((current_start, index));
-            current_start = index;
-            continue;
-         }
-         else
-         {
-            params = Some((current_start, index));
-            current_start = index;
-            continue;
-         }
       }
+
+      //Finally we populate the trailing data
+      //trailing = Some((current_start, message_string.len()));
+
 
       println!("Looking for items to respond to");
 
