@@ -80,8 +80,14 @@ impl<'a> Iterator for Connector<'a>
 
          
          message = self.parse_message(message_vec).unwrap();
+
+         println!("Message:");
+         println!("  prefix: {}", match message.get_prefix() {Some(m) => m, None => "None"});
+         println!("  command: {}", match message.get_command(){Some(m) => m, None => "None"});
+         println!("  params: {}", match message.get_params(){Some(m) => m, None => "None"});
+         println!("  trailing: {}", match message.get_trailing(){Some(m) => m, None => "None"});
          
-         match message.get_command().unwrap()
+         match message.get_prefix().unwrap()
          {
 				"PING" =>
             {
@@ -132,7 +138,7 @@ impl<'a> Connector<'a>
 
    fn ping_pong(&mut self, message: &Message) -> io::Result<usize>
    {
-      let pong_resp = format!("PONG {}", message.get_trailing().unwrap());
+      let pong_resp = format!("PONG {}", message.get_command().unwrap());
       println!("Send -> {}", pong_resp);
       try!(self.sock.write(pong_resp.as_bytes()));
       Ok(0)
@@ -187,29 +193,44 @@ impl<'a> Connector<'a>
 
       }
 
-      //Finally we populate the trailing data
-      //trailing = Some((current_start, message_string.len()));
-
-
       println!("Looking for items to respond to");
 
-      let (command_start, command_end) = command.unwrap();
+
+
       //TODO: I need to understand why I have to make a reference below since it's already an &str
-      let message_struct = match &message_string[command_start .. command_end]
+      let message_struct: Message = match command
       {
-         "PRIVMSG" =>
+         Some((command_start, command_end)) => 
          {
-            Message
+            match &message_string[command_start .. command_end]
             {
-               message_type: MessageType::PrivateMessage,
-               message_string: message_string.to_string(),
-               prefix: prefix,
-               command: command,
-               params: params,
-               trailing: trailing,
+               "PRIVMSG" =>
+               {
+                  Message
+                  {
+                     message_type: MessageType::PrivateMessage,
+                     message_string: message_string.to_string(),
+                     prefix: prefix,
+                     command: command,
+                     params: params,
+                     trailing: trailing,
+                  }
+               },
+               _ => 
+               {
+                  Message
+                  {
+                     message_type: MessageType::Unknown,
+                     message_string: message_string.to_string(),
+                     prefix: prefix,
+                     command: command,
+                     params: params,
+                     trailing: trailing,
+                  }
+               }
             }
          },
-         _ => 
+         _ =>
          {
             Message
             {
@@ -220,7 +241,7 @@ impl<'a> Connector<'a>
                params: params,
                trailing: trailing,
             }
-         },
+         }
       };
 
       Ok(message_struct)
@@ -256,7 +277,6 @@ impl Message
       {
          Some((start, end)) =>
          {
-            println!("prefix_start: {}, prefix_end: {}", start, end);
             Some(&self.message_string[start .. end])
          },
          _ => { None }
@@ -269,7 +289,6 @@ impl Message
       {
          Some((start, end)) =>
          {
-            println!("command_start: {}, command_end: {}", start, end);
             Some(&self.message_string[start .. end])
          },
          _ => { None }
