@@ -36,7 +36,7 @@ impl<'a> Iterator for Connector<'a>
          {
             if self.need_to_read
             {
-               println!("Reading from socket...");
+               //println!("Reading from socket...");
                let read_result = self.sock.read(&mut self.buf);
 
                self.end = match read_result
@@ -144,6 +144,7 @@ impl<'a> Connector<'a>
 		let message_slice: &[u8] = message_vec.as_slice();
 
       let message_string: &str = str::from_utf8(message_slice).unwrap();
+      print!("String: {}", message_string);
 
       let message_parts = message_string.match_indices(' ');
 
@@ -154,9 +155,17 @@ impl<'a> Connector<'a>
 
       let mut current_start: usize = 0;
       let mut current_count: usize = 0;
+      let mut first_skip = false;
       //TODO: fix this parsing order
       for message_part in message_parts
       {
+         if !first_skip 
+         {
+            first_skip = true;
+            current_start = 0;
+            continue;
+         }
+
          if current_count > 2
          {
             break;
@@ -166,30 +175,31 @@ impl<'a> Connector<'a>
          let (index, match_str) = message_part;
          println!("current_start: {}, current_count: {}, index: {}", current_start, current_count, index);
 
+
          if match_str.starts_with(":") && prefix == None
          {
             prefix = Some((current_start, index));
-            current_start = index + 1;
+            current_start = index;
             continue;
          }
 
          if match_str.starts_with(":") && prefix != None
          {
             trailing = Some((current_start, index));
-            current_start = index + 1;
+            current_start = index;
             continue;
          }
 
          if command == None 
          {
             command = Some((current_start, index));
-            current_start = index + 1;
+            current_start = index;
             continue;
          }
          else
          {
             params = Some((current_start, index));
-            current_start = index + 1;
+            current_start = index;
             continue;
          }
       }
@@ -259,7 +269,7 @@ impl Message
       {
          Some((start, end)) =>
          {
-            println!("prefix_start {}, prefix_end{}", start, end);
+            println!("prefix_start: {}, prefix_end: {}", start, end);
             Some(&self.message_string[start .. end])
          },
          _ => { None }
@@ -272,7 +282,7 @@ impl Message
       {
          Some((start, end)) =>
          {
-            println!("command_start {}, command_end{}", start, end);
+            println!("command_start: {}, command_end: {}", start, end);
             Some(&self.message_string[start .. end])
          },
          _ => { None }
@@ -281,7 +291,7 @@ impl Message
 
    pub fn get_params(&self) -> Option<&str>
    {
-      match self.prefix
+      match self.params
       {
          Some((start, end)) =>
          {
@@ -293,7 +303,7 @@ impl Message
 
    pub fn get_trailing(&self) -> Option<&str>
    {
-      match self.prefix
+      match self.trailing
       {
          Some((start, end)) =>
          {
