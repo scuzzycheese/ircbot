@@ -145,7 +145,7 @@ impl<'a> Connector<'a>
 
       let message_string: &str = str::from_utf8(message_slice).unwrap();
 
-      let mut message_parts = message_string.match_indices(' ');
+      let message_parts = message_string.match_indices(' ');
 
       let mut prefix: Option<(usize, usize)> = None;
       let mut command: Option<(usize, usize)> = None;
@@ -161,34 +161,40 @@ impl<'a> Connector<'a>
          {
             break;
          }
+         current_count = current_count + 1;
 
          let (index, match_str) = message_part;
+         println!("current_start: {}, current_count: {}, index: {}", current_start, current_count, index);
 
          if match_str.starts_with(":") && prefix == None
          {
             prefix = Some((current_start, index));
+            current_start = index + 1;
             continue;
          }
 
          if match_str.starts_with(":") && prefix != None
          {
             trailing = Some((current_start, index));
+            current_start = index + 1;
             continue;
          }
 
          if command == None 
          {
             command = Some((current_start, index));
+            current_start = index + 1;
             continue;
          }
          else
          {
             params = Some((current_start, index));
+            current_start = index + 1;
             continue;
          }
-         current_start = index + 1;
-         current_count = current_count + 1;
       }
+
+      println!("Looking for items to respond to");
 
       let (command_start, command_end) = command.unwrap();
       //TODO: I need to understand why I have to make a reference below since it's already an &str
@@ -249,26 +255,52 @@ impl Message
 {
    pub fn get_prefix(&self) -> Option<&str>
    {
-      let (prefix_start, prefix_end) = self.prefix.unwrap();
-      Some(&self.message_string[prefix_start .. prefix_end])
+      match self.prefix
+      {
+         Some((start, end)) =>
+         {
+            println!("prefix_start {}, prefix_end{}", start, end);
+            Some(&self.message_string[start .. end])
+         },
+         _ => { None }
+      }
    }
 
    pub fn get_command(&self) -> Option<&str>
    {
-      let (command_start, command_end) = self.prefix.unwrap();
-      Some(&self.message_string[command_start .. command_end])
+      match self.command
+      {
+         Some((start, end)) =>
+         {
+            println!("command_start {}, command_end{}", start, end);
+            Some(&self.message_string[start .. end])
+         },
+         _ => { None }
+      }
    }
 
    pub fn get_params(&self) -> Option<&str>
    {
-      let (params_start, params_end) = self.prefix.unwrap();
-      Some(&self.message_string[params_start .. params_end])
+      match self.prefix
+      {
+         Some((start, end)) =>
+         {
+            Some(&self.message_string[start .. end])
+         },
+         _ => { None }
+      }
    }
 
    pub fn get_trailing(&self) -> Option<&str>
    {
-      let (trailing_start, trailing_end) = self.prefix.unwrap();
-      Some(&self.message_string[trailing_start .. trailing_end])
+      match self.prefix
+      {
+         Some((start, end)) =>
+         {
+            Some(&self.message_string[start .. end])
+         },
+         _ => { None }
+      }
    }
 
 }
