@@ -85,9 +85,8 @@ impl<'a> Iterator for Connector<'a>
          println!("  prefix: {}", match message.get_prefix() {Some(m) => m, None => "None"});
          println!("  command: {}", match message.get_command(){Some(m) => m, None => "None"});
          println!("  params: {}", match message.get_params(){Some(m) => m, None => "None"});
-         println!("  trailing: {}", match message.get_trailing(){Some(m) => m, None => "None"});
          
-         match message.get_prefix().unwrap()
+         match message.get_command().unwrap()
          {
 				"PING" =>
             {
@@ -138,7 +137,7 @@ impl<'a> Connector<'a>
 
    fn ping_pong(&mut self, message: &Message) -> io::Result<usize>
    {
-      let pong_resp = format!("PONG {}", message.get_command().unwrap());
+      let pong_resp = format!("PONG {}", message.get_params().unwrap());
       println!("Send -> {}", pong_resp);
       try!(self.sock.write(pong_resp.as_bytes()));
       Ok(0)
@@ -167,23 +166,29 @@ impl<'a> Connector<'a>
 
          if ' ' == char 
          {
+            let mut message_chars = message_string.chars();
             match word_counter
             {
                0 => 
                {
-                  prefix = Some((start_index, index));
+                  
+                  if message_chars.next() == Some(':')
+                  {
+                     prefix = Some((start_index, index));
+                  }
+                  else
+                  {
+                     command = Some((start_index, index));
+                     word_counter = word_counter + 1;
+                  } 
+                  
                },
                1 => 
                {
                   command = Some((start_index, index));
                },
-               2 => 
-               {
-                  params = Some((start_index, index));
-               },
                _ => 
                {
-                  trailing = Some((start_index, message_string.len()));
                   break;
                },
             }
@@ -192,6 +197,23 @@ impl<'a> Connector<'a>
          }
 
       }
+      //look for the next ':'
+      let trailing_index = message_string[start_index .. message_string.len()].find(':');
+
+      //lastly we parse out the params and trailing
+      params = match trailing_index
+      {
+         Some(x) => 
+         {
+            trailing = Some((x + 1, message_string.len()));
+            Some((start_index, x))
+
+         },
+         _ =>
+         {
+            Some((start_index, message_string.len()))
+         } 
+      };
 
       println!("Looking for items to respond to");
 
@@ -301,19 +323,7 @@ impl Message
       {
          Some((start, end)) =>
          {
-            Some(&self.message_string[start .. end])
-         },
-         _ => { None }
-      }
-   }
-
-   pub fn get_trailing(&self) -> Option<&str>
-   {
-      match self.trailing
-      {
-         Some((start, end)) =>
-         {
-            Some(&self.message_string[start .. end])
+            Some(&self.message_string[start .. end].trim())
          },
          _ => { None }
       }
