@@ -105,6 +105,7 @@ impl<'a> Iterator for Connector<'a>
 
       Some(message)
    }
+
 }
 
 impl<'a> Connector<'a>
@@ -120,6 +121,12 @@ impl<'a> Connector<'a>
          start: 0,
          end: 0,
       }   
+   }
+
+   pub fn privmsg(&mut self, message: &str, dest: &str) -> io::Result<usize>
+   {
+      try!(self.sock.write(format!("PRIVMSG {} :{}\r\n", dest, message).as_bytes()));
+      Ok(0)
    }
 
    pub fn connect(&mut self) -> io::Result<usize>
@@ -138,7 +145,7 @@ impl<'a> Connector<'a>
 
    fn ping_pong(&mut self, message: &Message) -> io::Result<usize>
    {
-      let pong_resp = format!("PONG {}", message.get_params().unwrap());
+      let pong_resp = format!("PONG {}", message.get_trailing().unwrap());
       println!("Send -> {}", pong_resp);
       try!(self.sock.write(pong_resp.as_bytes()));
       Ok(0)
@@ -150,7 +157,7 @@ impl<'a> Connector<'a>
 		let message_slice: &[u8] = message_vec.as_slice();
 
       let message_string: &str = str::from_utf8(message_slice).unwrap();
-      print!("String: {}", message_string);
+      print!("SRV_MESSAGE: {}", message_string);
 
       let mut message_chars = message_string.char_indices().peekable();
 
@@ -216,9 +223,6 @@ impl<'a> Connector<'a>
          } 
       };
 
-      println!("Looking for items to respond to");
-
-
 
       //TODO: I need to understand why I have to make a reference below since it's already an &str
       let message_struct: Message = match command
@@ -276,7 +280,6 @@ pub enum MessageType
 {
    Unknown,
    PrivateMessage,
-   ChannelMessage,
 }
 
 pub struct Message
