@@ -85,6 +85,7 @@ impl<'a> Iterator for Connector<'a>
          println!("  prefix: {}", match message.get_prefix() {Some(m) => m, None => "None"});
          println!("  command: {}", match message.get_command(){Some(m) => m, None => "None"});
          println!("  params: {}", match message.get_params(){Some(m) => m, None => "None"});
+         println!("  trailing: {}", match message.get_trailing(){Some(m) => m, None => "None"});
          
          match message.get_command().unwrap()
          {
@@ -205,8 +206,8 @@ impl<'a> Connector<'a>
       {
          Some(x) => 
          {
-            trailing = Some((x + 1, message_string.len()));
-            Some((start_index, x))
+            trailing = Some((start_index + x, message_string.len()));
+            Some((start_index, start_index + x))
 
          },
          _ =>
@@ -320,6 +321,18 @@ impl Message
    pub fn get_params(&self) -> Option<&str>
    {
       match self.params
+      {
+         Some((start, end)) =>
+         {
+            Some(&self.message_string[start .. end].trim())
+         },
+         _ => { None }
+      }
+   }
+
+   pub fn get_trailing(&self) -> Option<&str>
+   {
+      match self.trailing
       {
          Some((start, end)) =>
          {
