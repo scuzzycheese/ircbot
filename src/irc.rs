@@ -128,7 +128,9 @@ impl<'a> Connector<'a>
 
    pub fn privmsg(&mut self, message: &str, dest: &str) -> io::Result<usize>
    {
-      try!(self.sock.write(format!("PRIVMSG {} :{}\r\n", dest, message).as_bytes()));
+      let send_string = format!("PRIVMSG {} :{}\r\n", dest, message);
+      println!("SENDING ----------> {}", send_string);
+      try!(self.sock.write(send_string.as_bytes()));
       Ok(0)
    }
 
