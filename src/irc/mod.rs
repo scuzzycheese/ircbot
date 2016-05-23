@@ -161,7 +161,8 @@ impl<'a> Connector<'a>
    fn parse_message(&mut self, message_vec: Vec<u8>) -> Result<Message, &'static str>
    {
 
-		let message_slice: &[u8] = message_vec.as_slice();
+      let message_vec_clone = message_vec.clone();
+		let message_slice: &[u8] = message_vec_clone.as_slice();
 
       let original_data: &str = str::from_utf8(message_slice).unwrap();
       print!("SRV_MESSAGE: {}", original_data);
@@ -250,6 +251,9 @@ impl<'a> Connector<'a>
                   let original_data = &original_data[trailing.unwrap().0 .. trailing.unwrap().1].split_at(1).1;
                   println!("Private Message: {}", original_data);
 
+//                  let from_nickname = 
+
+
 //                  if original_data.starts_with(nickname)
 //                  {
 //                     println!("Message Directed at me!!!");
@@ -284,11 +288,12 @@ impl<'a> Connector<'a>
 //                     {
 //                        irc.privmsg(&format!("Hi {}", from_nickname), destination);
 //                     }
+//                   }
 
 
                   Message
                   {
-                     original_data: message_vec.clone(),
+                     original_data: message_vec,
                      system: System::IRC,
                      message_type: MessageType::PrivateMessage,
 
@@ -303,7 +308,7 @@ impl<'a> Connector<'a>
                {
                   Message
                   {
-                     original_data: message_vec.clone(),
+                     original_data: message_vec,
                      system: System::IRC,
                      message_type: MessageType::Unknown,
 
@@ -320,7 +325,7 @@ impl<'a> Connector<'a>
          {
             Message
             {
-               original_data: message_vec.clone(),
+               original_data: message_vec,
                system: System::IRC,
                message_type: MessageType::Unknown,
 
@@ -336,6 +341,14 @@ impl<'a> Connector<'a>
       Ok(message_struct)
    }
 }
+
+
+fn parse_nickname(params: &str) -> Option<&str>
+{
+   println!("PARAMS: {}", params);
+   params.split(|c| c == ':' || c == '!').nth(1)
+}
+
 
 
 
