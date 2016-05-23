@@ -1,72 +1,81 @@
-
+use std::collections::HashMap;
+use std::str;
 
 pub enum MessageType
 {
    Unknown,
    PrivateMessage,
+   ChannelMessage,
+}
+
+pub enum System
+{
+   IRC,
 }
 
 pub struct Message
 {
+   pub original_data: Vec<u8>,
+   pub system: System,
    pub message_type: MessageType,
 
-   pub message_string: String,
+   pub origin_who: Option<(usize, usize)>,
+   pub origin_channel: Option<(usize, usize)>,
+   pub message: Option<(usize, usize)>,
 
-   pub prefix: Option<(usize, usize)>,
-   pub command: Option<(usize, usize)>,
-   pub params: Option<(usize, usize)>,
-   pub trailing: Option<(usize, usize)>,
+   pub type_specific_keys: HashMap<&'static str, (usize, usize)>,
 }
 
 
-impl Message
+//Generic message methods
+pub trait MessageFields 
 {
-   pub fn get_prefix(&self) -> Option<&str>
+   fn get_origin_who(&self) -> Option<&str>;
+   fn get_origin_channel(&self) -> Option<&str>;
+   fn get_message(&self) -> Option<&str>;
+}
+
+impl MessageFields for Message
+{
+   fn get_origin_who(&self) -> Option<&str>
    {
-      match self.prefix
+      match self.origin_who
       {
          Some((start, end)) =>
          {
-            Some(&self.message_string[start .. end])
+            let original_message: &str = str::from_utf8(&self.original_data).unwrap();
+            Some(&original_message[start .. end])
          },
          _ => { None }
       }
    }
 
-   pub fn get_command(&self) -> Option<&str>
+
+   fn get_origin_channel(&self) -> Option<&str>
    {
-      match self.command
+      match self.origin_channel
       {
          Some((start, end)) =>
          {
-            Some(&self.message_string[start .. end])
+            let original_message: &str = str::from_utf8(&self.original_data).unwrap();
+            Some(&original_message[start .. end])
          },
          _ => { None }
       }
    }
 
-   pub fn get_params(&self) -> Option<&str>
+   fn get_message(&self) -> Option<&str>
    {
-      match self.params
+      match self.message
       {
          Some((start, end)) =>
          {
-            Some(&self.message_string[start .. end].trim())
+            let original_message: &str = str::from_utf8(&self.original_data).unwrap();
+            Some(&original_message[start .. end])
          },
          _ => { None }
       }
    }
 
-   pub fn get_trailing(&self) -> Option<&str>
-   {
-      match self.trailing
-      {
-         Some((start, end)) =>
-         {
-            Some(&self.message_string[start .. end].trim())
-         },
-         _ => { None }
-      }
-   }
 
 }

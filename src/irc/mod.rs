@@ -2,9 +2,11 @@ use std::str;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::io;
+use std::collections::HashMap;
 
-pub use message::Message;
-pub use message::MessageType;
+use irc::keys::IRCFields;
+use message::*;
+pub mod keys;
 
 pub struct Connector<'a>
 {
@@ -161,10 +163,10 @@ impl<'a> Connector<'a>
 
 		let message_slice: &[u8] = message_vec.as_slice();
 
-      let message_string: &str = str::from_utf8(message_slice).unwrap();
-      print!("SRV_MESSAGE: {}", message_string);
+      let original_data: &str = str::from_utf8(message_slice).unwrap();
+      print!("SRV_MESSAGE: {}", original_data);
 
-      let mut message_chars = message_string.char_indices().peekable();
+      let mut message_chars = original_data.char_indices().peekable();
 
       let mut prefix: Option<(usize, usize)> = None;
       let mut command: Option<(usize, usize)> = None;
@@ -179,7 +181,7 @@ impl<'a> Connector<'a>
 
          if ' ' == char 
          {
-            let mut message_chars = message_string.chars();
+            let mut message_chars = original_data.chars();
             match word_counter
             {
                0 => 
@@ -211,53 +213,105 @@ impl<'a> Connector<'a>
 
       }
       //look for the next ':'
-      let trailing_index = message_string[start_index .. message_string.len()].find(':');
+      let trailing_index = original_data[start_index .. original_data.len()].find(':');
 
       //lastly we parse out the params and trailing
       params = match trailing_index
       {
          Some(x) => 
          {
-            trailing = Some((start_index + x, message_string.len()));
+            trailing = Some((start_index + x, original_data.len()));
             Some((start_index, start_index + x))
 
          },
          _ =>
          {
-            Some((start_index, message_string.len()))
+            Some((start_index, original_data.len()))
          } 
       };
 
+      //Add all the irc specific keys to a hash
+      let mut key_hash: HashMap<&'static str, (usize, usize)> = HashMap::new();
+      match prefix { Some(x) => { key_hash.insert(keys::Keys::Prefix.string(), x); } _ => {}};
+      match command { Some(x) => { key_hash.insert(keys::Keys::Command.string(), x); } _ => {}};
+      match params { Some(x) => { key_hash.insert(keys::Keys::Params.string(), x); } _ => {}};
+      match trailing { Some(x) => { key_hash.insert(keys::Keys::Trailing.string(), x); } _ => {}};
 
       //TODO: I need to understand why I have to make a reference below since it's already an &str
       let message_struct: Message = match command
       {
          Some((command_start, command_end)) => 
          {
-            match &message_string[command_start .. command_end]
+            match &original_data[command_start .. command_end]
             {
                "PRIVMSG" =>
                {
+
+                  let original_data = &original_data[trailing.unwrap().0 .. trailing.unwrap().1].split_at(1).1;
+                  println!("Private Message: {}", original_data);
+
+//                  if original_data.starts_with(nickname)
+//                  {
+//                     println!("Message Directed at me!!!");
+//                  }
+//                  else if original_data.contains(nickname)
+//                  {
+//
+//                     let from_nickname = match parse_nickname(out_prefix)
+//                     {
+//                        Some(x) => x,
+//                        None =>
+//                        {
+//                           println!("Error parsing Nickname!");
+//                           "IMPROBABLENICKNAME"
+//                        }
+//                     };
+//
+//
+//
+//                     let destination;
+//                     if out_params == nickname
+//                     {
+//                        destination = from_nickname;
+//                     }
+//                     else
+//                     {
+//                        destination = out_params;
+//                     }
+//
+//
+//                     if original_data.to_uppercase().starts_with("HI")
+//                     {
+//                        irc.privmsg(&format!("Hi {}", from_nickname), destination);
+//                     }
+
+
                   Message
                   {
+                     original_data: message_vec.clone(),
+                     system: System::IRC,
                      message_type: MessageType::PrivateMessage,
-                     message_string: message_string.to_string(),
-                     prefix: prefix,
-                     command: command,
-                     params: params,
-                     trailing: trailing,
+
+                     origin_who: Some((0, 0)),
+                     origin_channel: Some((0, 0)),
+                     message: Some((0, 0)),
+
+                     type_specific_keys: key_hash
                   }
                },
                _ => 
                {
                   Message
                   {
+                     original_data: message_vec.clone(),
+                     system: System::IRC,
                      message_type: MessageType::Unknown,
-                     message_string: message_string.to_string(),
-                     prefix: prefix,
-                     command: command,
-                     params: params,
-                     trailing: trailing,
+
+                     origin_who: Some((0, 0)),
+                     origin_channel: Some((0, 0)),
+                     message: Some((0, 0)),
+
+                     type_specific_keys: key_hash
                   }
                }
             }
@@ -266,12 +320,15 @@ impl<'a> Connector<'a>
          {
             Message
             {
+               original_data: message_vec.clone(),
+               system: System::IRC,
                message_type: MessageType::Unknown,
-               message_string: message_string.to_string(),
-               prefix: prefix,
-               command: command,
-               params: params,
-               trailing: trailing,
+
+               origin_who: Some((0, 0)),
+               origin_channel: Some((0, 0)),
+               message: Some((0, 0)),
+
+               type_specific_keys: key_hash
             }
          }
       };
