@@ -248,10 +248,10 @@ impl<'a> Connector<'a>
                "PRIVMSG" =>
                {
 
-                  let original_data = &original_data[trailing.unwrap().0 .. trailing.unwrap().1].split_at(1).1;
-                  println!("Private Message: {}", original_data);
+                  let trailing_data = &original_data[trailing.unwrap().0 .. trailing.unwrap().1].split_at(1).1;
 
-//                  let from_nickname = 
+                  let from_nickname = parse_nickname(original_data);
+                  println!("Private Message from {}: {}", from_nickname.unwrap(), trailing_data);
 
 
 //                  if original_data.starts_with(nickname)
