@@ -86,11 +86,11 @@ impl<'a> Iterator for Connector<'a>
          
          message = self.parse_message(message_vec).unwrap();
 
-         println!("Message:");
-         println!("  prefix: {}", match message.get_prefix() {Some(m) => m, None => "None"});
-         println!("  command: {}", match message.get_command(){Some(m) => m, None => "None"});
-         println!("  params: {}", match message.get_params(){Some(m) => m, None => "None"});
-         println!("  trailing: {}", match message.get_trailing(){Some(m) => m, None => "None"});
+         //println!("Message:");
+         //println!("  prefix: {}", match message.get_prefix() {Some(m) => m, None => "None"});
+         //println!("  command: {}", match message.get_command(){Some(m) => m, None => "None"});
+         //println!("  params: {}", match message.get_params(){Some(m) => m, None => "None"});
+         //println!("  trailing: {}", match message.get_trailing(){Some(m) => m, None => "None"});
          
          match message.get_command().unwrap()
          {
@@ -165,7 +165,7 @@ impl<'a> Connector<'a>
 		let message_slice: &[u8] = message_vec_clone.as_slice();
 
       let original_data: &str = str::from_utf8(message_slice).unwrap();
-      print!("SRV_MESSAGE: {}", original_data);
+      //print!("SRV_MESSAGE: {}", original_data);
 
       let mut message_chars = original_data.char_indices().peekable();
 
@@ -252,7 +252,7 @@ impl<'a> Connector<'a>
                   {
                      Some((start, end)) => 
                      {
-                        Some((start + 1, end))
+                        Some((start + 1, end - 2))
                      }
                      _ => { None }
                   };
@@ -261,8 +261,8 @@ impl<'a> Connector<'a>
                   let from_nickname_indices = parse_nickname(original_data);
 
 
-                  let message = &original_data[message_indices.unwrap().0 .. message_indices.unwrap().1];
-                  let from_nickname = &original_data[from_nickname_indices.unwrap().0 .. from_nickname_indices.unwrap().1];
+                  //let message = &original_data[message_indices.unwrap().0 .. message_indices.unwrap().1];
+                  //let from_nickname = &original_data[from_nickname_indices.unwrap().0 .. from_nickname_indices.unwrap().1];
                   //println!("Private Message from {}: {}", from_nickname, message);
                   
                   let params_str = &original_data[params.unwrap().0 .. params.unwrap().1];
@@ -275,7 +275,7 @@ impl<'a> Connector<'a>
                      {
                         (MessageType::ChannelMessage, params)
                      }
-                     flase => 
+                     false => 
                      {
                         (MessageType::PrivateMessage, None)
                      }
