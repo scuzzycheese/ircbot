@@ -247,59 +247,50 @@ impl<'a> Connector<'a>
             {
                "PRIVMSG" =>
                {
+                  //Parse out the message
+                  let message_indices: Option<(usize, usize)> = match trailing 
+                  {
+                     Some((start, end)) => 
+                     {
+                        Some((start + 1, end))
+                     }
+                     _ => { None }
+                  };
 
-                  let trailing_data = &original_data[trailing.unwrap().0 .. trailing.unwrap().1].split_at(1).1;
-
-                  let from_nickname = parse_nickname(original_data);
-                  println!("Private Message from {}: {}", from_nickname.unwrap(), trailing_data);
+                  //parse out the nickname
+                  let from_nickname_indices = parse_nickname(original_data);
 
 
-//                  if original_data.starts_with(nickname)
-//                  {
-//                     println!("Message Directed at me!!!");
-//                  }
-//                  else if original_data.contains(nickname)
-//                  {
-//
-//                     let from_nickname = match parse_nickname(out_prefix)
-//                     {
-//                        Some(x) => x,
-//                        None =>
-//                        {
-//                           println!("Error parsing Nickname!");
-//                           "IMPROBABLENICKNAME"
-//                        }
-//                     };
-//
-//
-//
-//                     let destination;
-//                     if out_params == nickname
-//                     {
-//                        destination = from_nickname;
-//                     }
-//                     else
-//                     {
-//                        destination = out_params;
-//                     }
-//
-//
-//                     if original_data.to_uppercase().starts_with("HI")
-//                     {
-//                        irc.privmsg(&format!("Hi {}", from_nickname), destination);
-//                     }
-//                   }
+                  let message = &original_data[message_indices.unwrap().0 .. message_indices.unwrap().1];
+                  let from_nickname = &original_data[from_nickname_indices.unwrap().0 .. from_nickname_indices.unwrap().1];
+                  //println!("Private Message from {}: {}", from_nickname, message);
+                  
+                  let params_str = &original_data[params.unwrap().0 .. params.unwrap().1];
+
+
+                  //If it's a private message directly to the client, then the origin channel is not valid
+                  let (message_type, origin_channel) = match params_str.starts_with('#') 
+                  {
+                     true => 
+                     {
+                        (MessageType::ChannelMessage, params)
+                     }
+                     flase => 
+                     {
+                        (MessageType::PrivateMessage, None)
+                     }
+                  };
 
 
                   Message
                   {
                      original_data: message_vec,
                      system: System::IRC,
-                     message_type: MessageType::PrivateMessage,
+                     message_type: message_type,
 
-                     origin_who: Some((0, 0)),
-                     origin_channel: Some((0, 0)),
-                     message: Some((0, 0)),
+                     origin_who: from_nickname_indices,
+                     origin_channel: origin_channel,
+                     message: message_indices,
 
                      type_specific_keys: key_hash
                   }
@@ -312,9 +303,9 @@ impl<'a> Connector<'a>
                      system: System::IRC,
                      message_type: MessageType::Unknown,
 
-                     origin_who: Some((0, 0)),
-                     origin_channel: Some((0, 0)),
-                     message: Some((0, 0)),
+                     origin_who: None,
+                     origin_channel: None,
+                     message: None,
 
                      type_specific_keys: key_hash
                   }
@@ -329,9 +320,9 @@ impl<'a> Connector<'a>
                system: System::IRC,
                message_type: MessageType::Unknown,
 
-               origin_who: Some((0, 0)),
-               origin_channel: Some((0, 0)),
-               message: Some((0, 0)),
+               origin_who: None,
+               origin_channel: None,
+               message: None,
 
                type_specific_keys: key_hash
             }
@@ -343,13 +334,18 @@ impl<'a> Connector<'a>
 }
 
 
-fn parse_nickname(params: &str) -> Option<&str>
+fn parse_nickname(params: &str) -> Option<(usize, usize)>
 {
-   println!("PARAMS: {}", params);
-   params.split(|c| c == ':' || c == '!').nth(1)
+   let start_before = params.find(':');
+   let end_after = params.find('!');
+
+   match (start_before, end_after) 
+   {
+      (Some(start), Some(end)) => 
+      {
+         Some((start + 1, end -1))
+      }
+      _ => { None }
+   }
 }
-
-
-
-
 
