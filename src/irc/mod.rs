@@ -165,7 +165,7 @@ impl<'a> Connector<'a>
 		let message_slice: &[u8] = message_vec_clone.as_slice();
 
       let original_data: &str = str::from_utf8(message_slice).unwrap();
-      //print!("SRV_MESSAGE: {}", original_data);
+      print!("SRV_MESSAGE: {}", original_data);
 
       let mut message_chars = original_data.char_indices().peekable();
 

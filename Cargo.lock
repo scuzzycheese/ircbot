@@ -1,4 +1,26 @@
 [root]
 name = "ircbot"
 version = "0.0.1"
+dependencies = [
+ "nlp 0.1.1 (git+https://github.com/Freyskeyd/nlp)",
+ "stem 0.1.0 (git+https://github.com/mrordinaire/rust-stem)",
+]
+
+[[package]]
+name = "itertools"
+version = "0.4.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "nlp"
+version = "0.1.1"
+source = "git+https://github.com/Freyskeyd/nlp#c2018b3806e70f43917c66775a14474b8e4e3b5d"
+dependencies = [
+ "itertools 0.4.15 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "stem"
+version = "0.1.0"
+source = "git+https://github.com/mrordinaire/rust-stem#9584f586d4299286d6acaf34949bf9823d19f825"
 

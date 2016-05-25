@@ -3,3 +3,9 @@
 name = "ircbot"
 version = "0.0.1"
 authors = ["Mamacos <dainem@amazon.com>"]
+
+[dependencies.stem]
+git = "https://github.com/mrordinaire/rust-stem"
+
+[dependencies.nlp]
+git = "https://github.com/Freyskeyd/nlp"
