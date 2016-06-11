@@ -1,6 +1,6 @@
 [package]
 
-name = "ircbot"
+name = "twodeltabot"
 version = "0.0.1"
 authors = ["Mamacos <dainem@amazon.com>"]
 
@@ -9,3 +9,7 @@ git = "https://github.com/mrordinaire/rust-stem"
 
 [dependencies.nlp]
 git = "https://github.com/Freyskeyd/nlp"
+
+[dependencies]
+curl = "0.3.0"
+websocket = "0.17.1"
