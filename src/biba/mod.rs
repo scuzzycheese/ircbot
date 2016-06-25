@@ -1,13 +1,13 @@
 use websocket::*;
 use websocket::client::request::Url;
 use openssl::ssl::*;
-use std::time::Duration;
-use std::thread::sleep;
-use std::io::{stdout, Write};
+//use std::time::Duration;
+//use std::thread::sleep;
+//use std::io::{stdout, Write};
 use curl::easy::Easy;
 use std::str;
-use std;
-use log::LogLevel;
+//use std;
+//use log::LogLevel;
 
 
 
@@ -15,8 +15,8 @@ pub struct Connector<'a>
 {
    sender: client::Sender<stream::WebSocketStream>,
    receiver: client::Receiver<stream::WebSocketStream>,
-   curl_handle: Optional<Easy>,
-   _relay_session: Optional<String>,
+   curl_handle: Option<Easy>,
+   _relay_session: Option<String>,
    nick: &'a str,
 }
 
@@ -86,7 +86,7 @@ impl<'a> Connector<'a>
    * This method logs into Biba, and returns the curl Easy session, and the 
    * _realy_session cookie that needs to be used for follor up requests
    */
-   fn login(&mut self, username: &str, password: &str) -> Result<(), &'static str>
+   pub fn login(&mut self, username: &str, password: &str) -> Result<(), &'static str>
    {
 
       let mut _relay_session: Option<String> = None;
@@ -123,9 +123,9 @@ impl<'a> Connector<'a>
       {
          201 => 
          {
-            self.curl_handle = handle;
+            self.curl_handle = Some(handle);
             self._relay_session = _relay_session;
-            Ok() 
+            Ok(())
          },
          _ =>
          {
