@@ -13,3 +13,4 @@ git = "https://github.com/Freyskeyd/nlp"
 [dependencies]
 curl = "0.3.0"
 websocket = "0.17.1"
+openssl = "0.7.13"
