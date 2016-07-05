@@ -7,7 +7,8 @@ use openssl::ssl::*;
 use curl::easy::Easy;
 use std::str;
 //use std;
-//use log::LogLevel;
+use log::LogLevel;
+use sqlite;
 
 
 
@@ -18,6 +19,7 @@ pub struct Connector<'a>
    curl_handle: Option<Easy>,
    _relay_session: Option<String>,
    nick: &'a str,
+   sqlite_connection: sqlite::Connection,
 }
 
 const BIBA_BASE_ADDRESS: &'static str = "https://app.biba.com";
@@ -27,7 +29,7 @@ impl<'a> Connector<'a>
 {
    pub fn new(nick: &'a str) -> Connector<'a>
    {
-
+      let connection = sqlite::open("biba.db").unwrap();
 
       let ssl_context: SslContext = SslContext::new(SslMethod::Sslv23).unwrap();
 
@@ -77,7 +79,8 @@ impl<'a> Connector<'a>
          receiver: receiver,
          curl_handle: None,
          _relay_session: None,
-         nick: nick
+         nick: nick,
+         sqlite_connection: connection,
       }   
    }
 
@@ -88,6 +91,8 @@ impl<'a> Connector<'a>
    */
    pub fn login(&mut self, username: &str, password: &str) -> Result<(), &'static str>
    {
+
+      self.build_sqlite_db();
 
       let mut _relay_session: Option<String> = None;
 
@@ -123,13 +128,52 @@ impl<'a> Connector<'a>
       {
          201 => 
          {
+
+            let relay_session_ref = _relay_session.unwrap().as_str();
+
+            self.add_key_to_db("_relay_session", relay_session_ref);
+
             self.curl_handle = Some(handle);
             self._relay_session = _relay_session;
+
             Ok(())
          },
          _ =>
          {
             Err("There was an error logging in to Biba")
+         }
+      }
+   }
+
+   fn add_key_to_db(&mut self, key: &str, value: &str)
+   {
+      let key_insert_result = self.sqlite_connection.execute("");
+      match key_insert_result
+      {
+         Err(error) => 
+         {
+            error!("Error adding key to biba_cache table: {}", error.message.unwrap());
+         },
+         Ok(_) => 
+         {
+            info!("added key {} to biba_cache table.", key);
+         }
+      }
+
+   }
+
+   fn build_sqlite_db(&mut self)
+   {
+      let create_table_result = self.sqlite_connection.execute("CREATE TABLE biba_cache(key TEXT, value TEXT);");
+      match create_table_result
+      {
+         Err(error) => 
+         {
+            warn!("biba_cache table already exists: {}", error.message.unwrap());
+         },
+         Ok(_) =>
+         {
+            info!("biba_cache table created.");
          }
       }
    }
