@@ -91,12 +91,26 @@ impl<'a> Connector<'a>
    */
    pub fn login(&mut self, username: &str, password: &str) -> Result<(), &'static str>
    {
+      let mut handle: Easy = Easy::new();
 
       self.build_sqlite_db();
 
+      match self.get_key_from_db("_relay_session")
+      {
+         Ok(value) => 
+         {
+            self.curl_handle = Some(handle);
+            self._relay_session = Some(value);
+            Ok(())
+         },
+         Err(error) => 
+         {
+            info!("Unable to fetch _relay_session key from cache: {}", error);
+         }
+      }
+
       let mut _relay_session: Option<String> = None;
 
-      let mut handle: Easy = Easy::new();
       handle.url(format!("{}/v2/sessions", BIBA_BASE_ADDRESS).as_str()).unwrap();
       handle.post(true).unwrap();
       handle.username(username).unwrap();
@@ -128,13 +142,12 @@ impl<'a> Connector<'a>
       {
          201 => 
          {
+            let relay_session_string: String = _relay_session.unwrap();
 
-            let relay_session_ref = _relay_session.unwrap().as_str();
-
-            self.add_key_to_db("_relay_session", relay_session_ref);
+            self.add_key_to_db("_relay_session", relay_session_string.as_str());
 
             self.curl_handle = Some(handle);
-            self._relay_session = _relay_session;
+            self._relay_session = Some(relay_session_string);
 
             Ok(())
          },
@@ -147,7 +160,7 @@ impl<'a> Connector<'a>
 
    fn add_key_to_db(&mut self, key: &str, value: &str)
    {
-      let key_insert_result = self.sqlite_connection.execute("");
+      let key_insert_result = self.sqlite_connection.execute(format!("INSERT INTO biba_cache(key, value) VALUES ('{}', '{}');", key, value));
       match key_insert_result
       {
          Err(error) => 
@@ -162,9 +175,30 @@ impl<'a> Connector<'a>
 
    }
 
+   fn get_key_from_db(&mut self, key: &str) -> Result<String, String>
+   {
+      let mut statement = self.sqlite_connection.prepare("SELECT * FROM biba_cache WHERE key = ?").unwrap();      
+      statement.bind(1, key).unwrap();
+
+      //Read the first row
+      match statement.next()
+      {
+         Ok(_) => 
+         {
+            Ok(statement.read::<String>(1).unwrap())
+         },
+         Err(error) =>
+         {
+            let error_message = error.message.unwrap();
+            error!("Unable to read key from biba_cache table: {}", error_message);
+            Err(error_message)
+         }
+      }
+   }
+
    fn build_sqlite_db(&mut self)
    {
-      let create_table_result = self.sqlite_connection.execute("CREATE TABLE biba_cache(key TEXT, value TEXT);");
+      let create_table_result = self.sqlite_connection.execute("CREATE TABLE biba_cache(key TEXT PRIMARY KEY, value TEXT);");
       match create_table_result
       {
          Err(error) => 
