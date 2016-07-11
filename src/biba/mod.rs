@@ -101,7 +101,7 @@ impl<'a> Connector<'a>
          {
             self.curl_handle = Some(handle);
             self._relay_session = Some(value);
-            Ok(())
+            return Ok(());
          },
          Err(error) => 
          {
@@ -185,7 +185,20 @@ impl<'a> Connector<'a>
       {
          Ok(_) => 
          {
-            Ok(statement.read::<String>(1).unwrap())
+            let string_read_column = statement.read::<String>(1);
+            match string_read_column
+            {
+               Ok(result) => 
+               {
+                  Ok(result)
+               }
+               Err(error) =>
+               {
+                  let error_message = error.message.unwrap();
+                  error!("Unable to read key from biba_cache table: {}", error_message);
+                  Err(error_message)
+               }
+            }
          },
          Err(error) =>
          {
