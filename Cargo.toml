@@ -1,6 +1,6 @@
 [package]
 
-name = "twodeltabot"
+name = "twodelta"
 version = "0.0.1"
 authors = ["Mamacos <dainem@amazon.com>"]
 
@@ -17,3 +17,4 @@ openssl = "0.7.13"
 env_logger = "0.3.3"
 log = "0.3.6"
 sqlite = "0.23.0"
+time = "0.1"

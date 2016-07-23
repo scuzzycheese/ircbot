@@ -1,13 +1,8 @@
 use websocket::*;
 use websocket::client::request::Url;
 use openssl::ssl::*;
-//use std::time::Duration;
-//use std::thread::sleep;
-//use std::io::{stdout, Write};
 use curl::easy::Easy;
 use std::str;
-//use std;
-use log::LogLevel;
 use sqlite;
 
 
@@ -30,6 +25,7 @@ impl<'a> Connector<'a>
    pub fn new(nick: &'a str) -> Connector<'a>
    {
       let connection = sqlite::open("biba.db").unwrap();
+      build_biba_settings(&connection);
 
       let ssl_context: SslContext = SslContext::new(SslMethod::Sslv23).unwrap();
 
@@ -41,37 +37,6 @@ impl<'a> Connector<'a>
       let client = response.begin();
       
       let (mut sender, mut receiver) = client.split();
-//
-//      for message in receiver.incoming_messages()
-//      {
-//         info!("Going to receive now...");
-//
-//         let new_message: Message;
-//
-//         match message
-//         {
-//            Ok(_) => 
-//            {
-//               new_message = message.unwrap();
-//            },
-//            Err(error) => 
-//            {
-//               error!("Error: {}", error);
-//            }
-//         }
-//
-//         sleep(Duration::new(1, 0));
-
-
-         //if message.unwrap() == Err
-         //{
-         //}
-
-
-         //let message: Message = message.unwrap();
-         //println!("Recv: {:?}", message);
-      //}
-
 
       Connector
       {
@@ -89,18 +54,22 @@ impl<'a> Connector<'a>
    * This method logs into Biba, and returns the curl Easy session, and the 
    * _realy_session cookie that needs to be used for follor up requests
    */
-   pub fn login(&mut self, username: &str, password: &str) -> Result<(), &'static str>
+   pub fn login(&mut self) -> Result<(), &'static str>
    {
+      let username = try!(self.get_setting_value("username"));
+      let password = try!(self.get_setting_value("password"));
+
+
       let mut handle: Easy = Easy::new();
 
-      self.build_sqlite_db();
+      self.build_biba_cache();
 
       match self.get_key_from_db("_relay_session")
       {
-         Ok(value) => 
+         Ok((value_string, expiry)) => 
          {
             self.curl_handle = Some(handle);
-            self._relay_session = Some(value);
+            self._relay_session = Some(value_string);
             return Ok(());
          },
          Err(error) => 
@@ -175,7 +144,7 @@ impl<'a> Connector<'a>
 
    }
 
-   fn get_key_from_db(&mut self, key: &str) -> Result<String, String>
+   fn get_key_from_db(&mut self, key: &str) -> Result<(String, i64), String>
    {
       let mut statement = self.sqlite_connection.prepare("SELECT * FROM biba_cache WHERE key = ?").unwrap();      
       statement.bind(1, key).unwrap();
@@ -186,15 +155,71 @@ impl<'a> Connector<'a>
          Ok(_) => 
          {
             let string_read_column = statement.read::<String>(1);
+            let integer_read_column = statement.read::<i64>(2);
+            match (string_read_column, integer_read_column)
+            {
+               (Ok(result_string), Ok(result_int)) => 
+               {
+                  Ok((result_string, result_int))
+               },
+               (Err(error_string), Err(error_int)) =>
+               {
+                  let error_message = format!("Errors fetching results from DB: {} - {}", error_string.message.unwrap(), error_int.message.unwrap());
+                  error!("Unable to read key from biba_cache table: {}", error_message);
+                  Err(error_message)
+               },
+               _ => 
+               {
+                  error!("Unable to read key from biba_cache table");
+                  Err("Error fetching results from DB".to_string())
+               }
+            }
+         },
+         Err(error) =>
+         {
+            let error_message = error.message.unwrap();
+            error!("Unable to read key from biba_cache table: {}", error_message);
+            Err(error_message)
+         }
+      }
+   }
+
+   fn build_biba_cache(&mut self)
+   {
+      let create_table_result = self.sqlite_connection.execute("CREATE TABLE biba_cache(key TEXT PRIMARY KEY, value TEXT, expiry INTEGER);");
+      match create_table_result
+      {
+         Err(error) => 
+         {
+            warn!("biba_cache table already exists: {}", error.message.unwrap());
+         },
+         Ok(_) =>
+         {
+            info!("biba_cache table created.");
+         }
+      }
+   }
+
+   fn get_setting_value(&mut self, key: &str) -> Result<String, String>
+   {
+      let mut statement = self.sqlite_connection.prepare("SELECT * FROM biba_settings WHERE key = ?").unwrap();      
+      statement.bind(1, key).unwrap();
+
+      //Read the first row
+      match statement.next()
+      {
+         Ok(_) => 
+         {
+            let string_read_column = statement.read::<String>(1);
             match string_read_column
             {
-               Ok(result) => 
+               Ok(result_string) => 
                {
-                  Ok(result)
-               }
-               Err(error) =>
+                  Ok(result_string)
+               },
+               Err(error_string) =>
                {
-                  let error_message = error.message.unwrap();
+                  let error_message = format!("Errors fetching results from DB: {}", error_string.message.unwrap());
                   error!("Unable to read key from biba_cache table: {}", error_message);
                   Err(error_message)
                }
@@ -209,23 +234,30 @@ impl<'a> Connector<'a>
       }
    }
 
-   fn build_sqlite_db(&mut self)
+}
+
+fn build_biba_settings(connection: &sqlite::Connection)
+{
+   let create_table_result = connection.execute
+   ("
+      CREATE TABLE biba_settings(key TEXT PRIMARY KEY, value TEXT);
+      INSERT INTO biba_settings(key, value) VALUES(\"name\", \"TwoDelta\");
+      INSERT INTO biba_settings(key, value) VALUES(\"username\", \"someusername\");
+      INSERT INTO biba_settings(key, value) VALUES(\"password\", \"somepassword\");
+   ");
+   match create_table_result
    {
-      let create_table_result = self.sqlite_connection.execute("CREATE TABLE biba_cache(key TEXT PRIMARY KEY, value TEXT);");
-      match create_table_result
+      Err(error) => 
       {
-         Err(error) => 
-         {
-            warn!("biba_cache table already exists: {}", error.message.unwrap());
-         },
-         Ok(_) =>
-         {
-            info!("biba_cache table created.");
-         }
+         warn!("biba_settings table already exists: {}", error.message.unwrap());
+      },
+      Ok(_) =>
+      {
+         info!("biba_settings table created.");
       }
    }
-
-
 }
+
+
 
 
