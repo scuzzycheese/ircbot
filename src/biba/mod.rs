@@ -54,11 +54,13 @@ impl<'a> Connector<'a>
    * This method logs into Biba, and returns the curl Easy session, and the 
    * _realy_session cookie that needs to be used for follor up requests
    */
-   pub fn login(&mut self) -> Result<(), &'static str>
+   pub fn login(&mut self) -> Result<(), String>
    {
       let username = try!(self.get_setting_value("username"));
       let password = try!(self.get_setting_value("password"));
 
+      info!("username: \"{}\"", username);
+      info!("password: \"{}\"", password);
 
       let mut handle: Easy = Easy::new();
 
@@ -82,8 +84,8 @@ impl<'a> Connector<'a>
 
       handle.url(format!("{}/v2/sessions", BIBA_BASE_ADDRESS).as_str()).unwrap();
       handle.post(true).unwrap();
-      handle.username(username).unwrap();
-      handle.password(password).unwrap();
+      handle.username(&username).unwrap();
+      handle.password(&password).unwrap();
 
       {
          let mut transfer = handle.transfer();
@@ -106,7 +108,7 @@ impl<'a> Connector<'a>
          transfer.perform().unwrap();
       }
 
-      info!("{}", handle.response_code().unwrap());
+      info!("BIBA RESPONSE CODE: {}", handle.response_code().unwrap());
       match handle.response_code().unwrap()
       {
          201 => 
@@ -122,7 +124,8 @@ impl<'a> Connector<'a>
          },
          _ =>
          {
-            Err("There was an error logging in to Biba")
+            error!("There was an error logging in to Biba");
+            Err("There was an error logging in to Biba".to_string())
          }
       }
    }

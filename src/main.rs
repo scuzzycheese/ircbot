@@ -21,6 +21,7 @@ fn main()
    env_logger::init().unwrap();
 
    let mut biba = biba::Connector::new("test");
+   biba.login();
 
 
 
