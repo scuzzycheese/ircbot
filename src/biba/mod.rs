@@ -1,9 +1,10 @@
+
 use websocket::*;
 use websocket::client::request::Url;
 use openssl::ssl::*;
 use curl::easy::Easy;
 use std::str;
-use sqlite;
+use std::io::{Read};
 
 pub mod settings;
 
@@ -41,7 +42,7 @@ impl<'a> Connector<'a>
       let response = request.send().unwrap(); // Send the request
       let client = response.begin();
       
-      let (mut sender, mut receiver) = client.split();
+      let (sender, receiver) = client.split();
 
       Connector
       {
@@ -64,13 +65,14 @@ impl<'a> Connector<'a>
       let username = try!(self.settings.get_setting_value("username"));
       let password = try!(self.settings.get_setting_value("password"));
 
-      info!("username: \"{}\"", username);
-      info!("password: \"{}\"", password);
+      //info!("username: \"{}\"", username);
+      //info!("password: \"{}\"", password);
 
       let mut handle: Easy = Easy::new();
 
       match self.settings.get_key_from_db("_relay_session")
       {
+         //TODO: Implement expiry when reading the relay_session
          Ok((value_string, expiry)) => 
          {
             self.curl_handle = Some(handle);
@@ -133,9 +135,55 @@ impl<'a> Connector<'a>
       }
    }
 
+   pub fn send_chat_room_message(&mut self, room_id: u64, message: &str) -> Result<(), String>
+   {
+      //we need our string as bytes
+      let mut message_data: &[u8] = message.as_bytes();
 
 
+      let mut curl_handle = match self.curl_handle
+      {
+         Some(ref mut curl_handle) => 
+         {
+            curl_handle
+         },
+         _ =>
+         {
+            error!("No curl handle available.");
+            return Err("No curl handle available.".to_string());
+         }
+      };
+
+      //u := fmt.Sprintf("/chat_rooms/%d/chat_room_messages", req.RoomId)
+      curl_handle.url(format!("{}/chat_rooms/{}/chat_room_messages", BIBA_BASE_ADDRESS, room_id).as_str()).unwrap();
+      curl_handle.post(true).unwrap();
+      curl_handle.post_field_size(message_data.len() as u64).unwrap();
+
+      let mut transfer = curl_handle.transfer();
+      transfer.read_function
+      (
+         |buf|
+         {
+            Ok(message_data.read(buf).unwrap_or(0))
+         }
+      ).unwrap();
+
+      try!
+      (
+         transfer.perform().map_err(|err| err.to_string())
+      );
+
+      Ok(())
+   }
+
+}
 
 
+impl<'a> Drop for Connector<'a>
+{
+   fn drop(&mut self)
+   {
+      info!("DROP CALLED!");
+   }
 }
 
