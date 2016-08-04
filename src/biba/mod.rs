@@ -1,7 +1,6 @@
-
-use websocket::*;
-use websocket::client::request::Url;
-use openssl::ssl::*;
+//use websocket::*;
+//use websocket::client::request::Url;
+//use openssl::ssl::*;
 use curl::easy::Easy;
 use std::str;
 use std::io::{Read};
@@ -14,8 +13,8 @@ pub mod settings;
 
 pub struct Connector<'a>
 {
-   sender: client::Sender<stream::WebSocketStream>,
-   receiver: client::Receiver<stream::WebSocketStream>,
+   //sender: client::Sender<stream::WebSocketStream>,
+   //receiver: client::Receiver<stream::WebSocketStream>,
    curl_handle: Option<Easy>,
    _relay_session: Option<String>,
    nick: &'a str,
@@ -33,21 +32,17 @@ impl<'a> Connector<'a>
 
       let bot_nick = settings.get_setting_value("name");
 
-      let ssl_context: SslContext = SslContext::new(SslMethod::Sslv23).unwrap();
-
-      let url = Url::parse("wss://ec2-54-174-239-169.compute-1.amazonaws.com").unwrap(); // Get the URL
-      let request = Client::connect_ssl_context(url, &ssl_context).unwrap(); // Connect to the server
-
-
-      let response = request.send().unwrap(); // Send the request
-      let client = response.begin();
-      
-      let (sender, receiver) = client.split();
+      //let ssl_context: SslContext = SslContext::new(SslMethod::Sslv23).unwrap();
+      //let url = Url::parse("wss://ec2-54-174-239-169.compute-1.amazonaws.com").unwrap(); // Get the URL
+      //let request = Client::connect_ssl_context(url, &ssl_context).unwrap(); // Connect to the server
+      //let response = request.send().unwrap(); // Send the request
+      //let client = response.begin();
+      //let (sender, receiver) = client.split();
 
       Connector
       {
-         sender: sender,
-         receiver: receiver,
+         //sender: sender,
+         //receiver: receiver,
          curl_handle: None,
          _relay_session: None,
          nick: nick,
@@ -102,7 +97,20 @@ impl<'a> Connector<'a>
                if utf8_header.starts_with("Set-Cookie: _relay_session=")
                {
                   info!("found _relay_session");
-                  _relay_session = Some(utf8_header[12..].to_string());
+                  let end_index: Option<usize> = utf8_header.find(';');
+                  
+                  
+                  _relay_session = match end_index
+                  {
+                     Some(index) =>
+                     {
+                        Some(utf8_header[27 .. index].to_string())
+                     },
+                     None => 
+                     {
+                        Some(utf8_header[27 ..].to_string())
+                     }
+                  };
                }
 
                info!("header: {}", str::from_utf8(header).unwrap());
