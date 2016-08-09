@@ -10,6 +10,9 @@ extern crate nlp;
 use nlp::*;
 extern crate websocket;
 
+#[macro_use]
+extern crate json;
+
 pub mod biba;
 
 use log::LogLevel;

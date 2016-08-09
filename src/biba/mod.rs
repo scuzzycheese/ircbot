@@ -4,6 +4,9 @@
 use curl::easy::Easy;
 use std::str;
 use std::io::{Read};
+use std::io::{stdout, Write};
+
+use json;
 
 pub mod settings;
 
@@ -81,6 +84,8 @@ impl<'a> Connector<'a>
       }
 
       let mut _relay_session: Option<String> = None;
+      let mut session_name: Option<String> = None;
+      let mut session_id: Option<String> = None;
 
       handle.url(format!("{}/v2/sessions", BIBA_BASE_ADDRESS).as_str()).unwrap();
       handle.post(true).unwrap();
@@ -89,6 +94,54 @@ impl<'a> Connector<'a>
 
       {
          let mut transfer = handle.transfer();
+
+         transfer.write_function
+         (
+            {
+               |data|
+               {
+                  let data_utf8_string = match str::from_utf8(data)
+                  {
+                     Ok(s) => s,
+                     Err(e) => 
+                     {
+                        error!("Unable to convert login response from Biba server to utf8: {}", e);
+                        return Ok(data.len());
+                     }
+                  };
+
+                  let login_resp = match json::parse(data_utf8_string)
+                  {
+                     Ok(p) => p,
+                     Err(e) => 
+                     {
+                        error!("Unable to parse JSON response from login to Biba: {}", e);
+                        return Ok(data.len());
+                     }
+                  };
+
+                  
+
+                  session_id = match login_resp["id"].is_null()
+                  {
+                     true =>  None,
+                     false => Some(login_resp["id"].to_string())
+                  }; 
+
+                  session_name = match login_resp["full_name"].is_null()
+                  {
+                     true =>  None,
+                     false => Some(login_resp["full_name"].to_string())
+                  }; 
+
+                  //TODO: Store these in the database, if we need to keep them
+                  info!("Session ID: {}, Name: {}", session_id.as_ref().unwrap_or(&"NONE".to_string()), session_name.as_ref().unwrap_or(&"NONE".to_string()));
+
+                  Ok(data.len())
+               }
+            }
+         ).unwrap();
+
          transfer.header_function
          (
             |header|
