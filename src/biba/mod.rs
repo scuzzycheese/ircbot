@@ -125,13 +125,21 @@ impl<'a> Connector<'a>
                   session_id = match login_resp["id"].is_null()
                   {
                      true =>  None,
-                     false => Some(login_resp["id"].to_string())
+                     false => 
+                     {
+                        self.settings.add_key_to_db("session_id", &login_resp["id"].to_string());
+                        Some(login_resp["id"].to_string())
+                     }
                   }; 
 
                   session_name = match login_resp["full_name"].is_null()
                   {
                      true =>  None,
-                     false => Some(login_resp["full_name"].to_string())
+                     false => 
+                     {
+                        self.settings.add_key_to_db("session_full_name", &login_resp["full_name"].to_string());
+                        Some(login_resp["full_name"].to_string())
+                     }
                   }; 
 
                   //TODO: Store these in the database, if we need to keep them
